@@ -6,9 +6,26 @@
   "compatibility_flags": ["nodejs_compat"],
   "assets": {
     "directory": "./public",
-    "binding": "ASSETS"
+    "binding": "ASSETS",
+    // Without this, Cloudflare serves matching static assets BEFORE invoking
+    // the Worker — bypassing both the Access JWT check and the security
+    // headers. All requests must flow through src/index.js.
+    "run_worker_first": true
   },
+
+  // ---- Cloudflare Access (auth) ----
+  // Step 1: uncomment the route below once the cakewebsites.com zone is on this
+  //         Cloudflare account (deploy fails otherwise). Change the subdomain
+  //         if you prefer something other than tasks.cakewebsites.com.
+  // "routes": [{ "pattern": "tasks.cakewebsites.com", "custom_domain": true }],
+
   "vars": {
     "TEAMWORK_DOMAIN": "my.cakewebsites.com"
+
+    // Step 2: after creating the Access application in Zero Trust, set these to
+    //         activate Worker-side JWT verification (defense-in-depth — blocks
+    //         direct hits on the workers.dev URL that bypass the Access edge):
+    // "CF_ACCESS_TEAM_DOMAIN": "<your-team>.cloudflareaccess.com",
+    // "CF_ACCESS_AUD": "<Application Audience (AUD) tag from the Access app>"
   }
 }

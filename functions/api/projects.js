@@ -97,6 +97,15 @@ export async function onRequestPost({ request, env }) {
 
   const data = await res.json().catch(() => ({}));
   const id = Number(data.id ?? res.headers.get('id'));
+  if (!Number.isFinite(id)) {
+    // The project may exist in Teamwork — tell the PM to check before retrying,
+    // otherwise a retry creates a duplicate.
+    console.error('[projects] create succeeded but no id in response', data);
+    return Response.json(
+      { error: 'Project may have been created but Teamwork returned no id — check Teamwork before retrying.' },
+      { status: 502 }
+    );
+  }
   const url =
     res.headers.get('Location') ??
     `https://${TEAMWORK_DOMAIN}/projects/${id}`;

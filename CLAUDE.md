@@ -34,7 +34,8 @@ TEAMWORK_API_TOKEN=...
 | `public/index.html` | 4-screen UI: configure → pick project → preview → success |
 | `public/app.js` | All frontend logic — state machine, API calls, rendering |
 | `public/styles.css` | All styles |
-| `src/index.js` | Worker entry point — routes `/api/*` to function handlers |
+| `src/index.js` | Worker entry point — Access check, security headers, routes `/api/*` to function handlers |
+| `src/access.js` | Cloudflare Access JWT verification (no-op until env vars set) |
 | `functions/api/projects.js` | GET/POST Teamwork projects |
 | `functions/api/projects/[projectId]/tasklists.js` | GET tasklists for a project |
 | `functions/api/projects/[projectId]/members.js` | GET project team members (internal staff only) |
@@ -63,13 +64,19 @@ Configure comes first so AI generation happens upfront. In batch mode (multiple 
 - Teamwork writes are sequential — the API rejects parallel writes from the same token
 - `state.batchItems` holds the form inputs; `state.batchPreviews` holds the generated previews
 - `state.isBatchMode` is `true` during AI Generate; the confirm button routes to `confirmBatchCreate()`
-- Each `batchPreview` item carries its own project fields: `projectId`, `projectName`, `projectMembers`, `tasklistMode`, `existingTasklistId`, `assigneeId`
-- Batch card subtasks support drag-to-reorder (same pattern as single-task preview)
+- Each `batchPreview` item carries its own project fields: `projectId`, `projectName`, `projectMembers`, `assigneeId`. Batch always creates a **new** tasklist — there is no per-card tasklist mode
+- Subtask editing (name/description textareas, per-subtask assignee, remove, drag-to-reorder) is rendered by the shared `renderSubtaskList()` in `app.js` — used by both the single-task preview and every batch card; change it once, both flows get it
 
 ### AI modes (`/api/preview`)
 - `design` — full generation from description/email → tasklist name + parent task + subtasks + descriptions
 - `tune` — adjusts wording of fixed template subtasks based on PM notes
 - `generate` — produces subtasks only from a description (used by regenerate panel)
+
+### Failure recovery
+- **Resumable creation** — `/api/create` accepts an optional `resume: { tasklistId, parentTaskId }`. `tasklistId` skips tasklist creation; `parentTaskId` additionally skips parent-task creation. Retries can never duplicate steps that already succeeded.
+- **Retry failed** — the success screen shows a "Retry failed" button when any task failed or was partially created. `state.lastBatchResults` / `state.lastSingleAttempt` hold the original payloads plus responses; `buildRetryPayload()` re-sends only the failed subtasks with the right `resume` info.
+- **Assignment failures are warnings, not failures** — a task that was created but couldn't be assigned is reported in `warnings`, never as an error (an error would invite a duplicating retry).
+- **Draft persistence** — the serialisable slice of `state` is saved to sessionStorage (`taskBuilderDraft.v1`) on navigation and debounced edits, restored at boot, and cleared on publish or "Build another". A page refresh no longer destroys generated previews.
 
 ### Teamwork API notes
 - Tasklist creation uses the **v1** endpoint (`/projects/:id/tasklists.json`) — v3 returns 405
@@ -81,14 +88,22 @@ Configure comes first so AI generation happens upfront. In batch mode (multiple 
 
 ## CSS Architecture
 
-Styles use **Tailwind CDN** (`preflight: false`) alongside a hand-authored `public/styles.css`.
+All styles are hand-authored in `public/styles.css` — **no Tailwind, no build step** (Tailwind CDN was removed June 2026; zero utility classes were in use).
 
 - `styles.css` owns all base resets, design tokens (`:root` custom properties), and semantic component classes
-- Tailwind is configured with `corePlugins: { preflight: false }` — **required** because the CDN injects a `<style>` tag at runtime *after* the `<link rel="stylesheet">`, which would otherwise let Tailwind's Preflight resets (zero padding on inputs/buttons, `font-size: inherit` on headings) win the cascade
-- The Tailwind config in `index.html` registers brand colors as utility class names for ad-hoc use; design tokens are also defined as CSS custom properties in `:root` for component styles
-- Use semantic classes (`.primary`, `.ghost`, `.inline-edit`, etc.) for components; Tailwind utilities for one-off layout tweaks only
+- Use semantic classes (`.primary`, `.ghost`, `.inline-edit`, etc.); brand colors live as CSS custom properties in `:root`
+- The Worker sets a strict CSP on served pages (`SECURITY_HEADERS` in `src/index.js`) — `script-src 'self'`, so **no inline `<script>` tags or new third-party scripts** without updating the CSP; styles/fonts are allowlisted for Fontshare only
 
 Design context and token reference: `.impeccable.md` in the project root.
+
+## Auth (Cloudflare Access)
+
+Two layers, both inert until configured:
+
+1. **Edge gate** — a Cloudflare Access application in Zero Trust covering the Worker's custom domain. The route lives in `wrangler.jsonc`, commented out until the `cakewebsites.com` zone is on the account.
+2. **Worker-side JWT verification** (`src/access.js`) — verifies the `Cf-Access-Jwt-Assertion` header (signature via team JWKS, audience, issuer, expiry) on every request, pages and API alike. Activated by setting `CF_ACCESS_TEAM_DOMAIN` and `CF_ACCESS_AUD` in `wrangler.jsonc` vars; skipped when unset so local dev keeps working. This blocks direct hits on the workers.dev URL that would bypass the Access edge.
+
+Setup order: uncomment the custom-domain route in `wrangler.jsonc` → in Zero Trust create a self-hosted Access application for that domain (policy: Allow emails ending in `@cakewebsites.com`, Google as IdP) → copy the app's Audience (AUD) tag into `CF_ACCESS_AUD` and set `CF_ACCESS_TEAM_DOMAIN` → deploy.
 
 ## Conventions
 - No TypeScript, no bundler — keep it simple; the Worker runtime handles ES modules natively

@@ -25,6 +25,7 @@ export async function onRequestGet({ params, env }) {
   const auth = btoa(`${TEAMWORK_API_TOKEN}:x`);
   const res = await fetch(tw.toString(), {
     headers: { Authorization: `Basic ${auth}` },
+    signal: AbortSignal.timeout(10_000),
   });
 
   if (!res.ok) {

@@ -763,8 +763,27 @@ button.ghost.small[aria-expanded="true"] {
   border-radius: 8px;
   font-size: 14px;
   margin: 16px 0;
+  white-space: pre-line; /* error/warning lists are \n-joined */
 }
 .warning:empty { display: none; }
+
+/* Per-task tasklist links on the batch success screen */
+.success-links-list {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.success-links-list a {
+  color: var(--primary);
+  font-size: 14px;
+  font-weight: 500;
+  text-decoration: none;
+}
+.success-links-list a:hover { text-decoration: underline; }
+.success-links-list a::after { content: " ↗"; }
 
 /* ====== Assignee field ====== */
 
@@ -1038,3 +1057,95 @@ button.ghost.small[aria-expanded="true"] {
   flex-direction: column;
   gap: 16px;
 }
+
+/* ====== Structured (Cake Task v1) ====== */
+
+/* Review banner — surfaces AI confidence and fields needing PM input */
+.review-banner {
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  padding: 12px 16px;
+  margin-bottom: 16px;
+  font-size: 14px;
+  background: var(--warning-bg);
+  color: var(--warning-fg);
+  border-color: #F0E0A0;
+}
+.review-banner .rb-row + .rb-row { margin-top: 6px; }
+.review-banner ul { margin: 4px 0 0; padding-left: 20px; }
+.review-banner.conf-high { background: #EAF6EE; color: #1F6B3A; border-color: #BFE3CB; }
+.review-banner.conf-medium { background: var(--warning-bg); color: var(--warning-fg); border-color: #F0E0A0; }
+.review-banner.conf-low { background: #FBEAEA; color: #8A2B2B; border-color: #ECC2C2; }
+
+/* Schema field editor */
+#structured-fields { margin: 8px 0 24px; }
+#structured-fields .sf-section {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+  margin: 20px 0 8px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--border);
+}
+#structured-fields .sf-section:first-child { margin-top: 0; }
+.sf-field { margin-bottom: 10px; }
+.sf-field > label {
+  display: block;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--fg);
+  margin-bottom: 4px;
+}
+.sf-input {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  font: inherit;
+  font-size: 14px;
+  color: var(--fg);
+  background: #fff;
+  resize: none;
+}
+.sf-input:focus { outline: 2px solid var(--primary); border-color: var(--primary); }
+textarea.sf-input { overflow-y: hidden; }
+
+/* Prefix multi-select */
+.sf-prefixes { display: flex; flex-wrap: wrap; gap: 8px; }
+.sf-prefix {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  font-size: 13px;
+  cursor: pointer;
+  user-select: none;
+}
+.sf-prefix:has(input:checked) {
+  background: var(--primary);
+  color: var(--primary-fg);
+  border-color: var(--primary);
+}
+
+/* Acceptance criteria rows */
+.sf-acceptance { display: flex; flex-direction: column; gap: 8px; }
+.sf-acc-row {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr auto;
+  gap: 8px;
+  align-items: center;
+}
+.sf-acc-row .remove {
+  border: none;
+  background: none;
+  color: var(--muted);
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 4px;
+}
+.sf-acc-row .remove:hover { color: #8A2B2B; }

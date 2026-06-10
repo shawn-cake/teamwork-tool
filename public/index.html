@@ -9,40 +9,8 @@
   <link rel="preconnect" href="https://api.fontshare.com">
   <link href="https://api.fontshare.com/v2/css?f[]=satoshi@900,700,500,400,300&display=swap" rel="stylesheet">
 
-  <!-- Tailwind CSS (CDN) -->
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script>
-    tailwind.config = {
-      corePlugins: {
-        preflight: false,   // our styles.css owns all base resets
-      },
-      theme: {
-        fontFamily: {
-          sans: ['Satoshi', 'ui-sans-serif', 'system-ui', 'sans-serif'],
-        },
-        extend: {
-          colors: {
-            // Cake brand
-            'cake-blue-dark':   '#22568A',
-            'cake-blue':        '#3087E0',
-            'cake-blue-soft':   '#E3F1FF',
-            'cake-yellow':      '#FFD176',
-            'cake-yellow-soft': '#FFF7E5',
-            'cake-ink':         '#40404B',
-            // App surface tokens — matches CSS custom properties
-            'app-bg':           '#F3F5F8',
-            'app-surface':      '#FFFFFF',
-            'app-muted':        '#697586',
-            'app-border':       '#DDE1E7',
-            'app-border-strong':'#B8C4D0',
-            'app-hover':        '#EEF1F5',
-          },
-        },
-      },
-    }
-  </script>
-
-  <!-- Component styles — loaded after Tailwind so our classes take precedence -->
+  <!-- All styles are hand-authored in styles.css (design tokens + semantic
+       component classes). No Tailwind, no build step. -->
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -128,6 +96,8 @@
           <p class="hint" id="assignee-hint"></p>
         </div>
 
+        <div class="status" id="pick-project-status" aria-live="polite"></div>
+
         <div class="actions">
           <button type="button" class="ghost" id="back-to-configure">← Back</button>
           <button type="button" class="primary" id="continue-to-preview">Continue →</button>
@@ -138,6 +108,15 @@
     <!-- Screen 1: configure -->
     <section class="screen" id="screen-form" data-active="true">
       <form id="campaign-form">
+        <fieldset id="structure-fieldset">
+          <legend>Tasking structure</legend>
+          <div class="radio-row">
+            <label><input type="radio" name="taskStructure" value="quick" checked> <span>Quick</span></label>
+            <label><input type="radio" name="taskStructure" value="structured"> <span>Structured (v1)</span></label>
+          </div>
+          <p class="hint" id="structure-hint">Quick is the lean task. Structured generates the full Cake Task v1 schema — strategy, acceptance criteria, billing, ownership — one task at a time.</p>
+        </fieldset>
+
         <fieldset id="template-fieldset">
           <legend>Task type</legend>
           <div class="template-row">
@@ -218,6 +197,9 @@
 
     <!-- Screen 3: preview -->
     <section class="screen" id="screen-preview">
+      <!-- Structured (v1) review banner — confidence / assumptions / missing fields -->
+      <div id="structured-review-banner" hidden></div>
+
       <div class="preview-summary">
         <div class="preview-row" id="preview-new-project-row" hidden>
           <span class="preview-label">New project</span><span id="preview-new-project"></span>
@@ -230,6 +212,9 @@
           <select id="preview-assignee-select" class="preview-assignee-select"></select>
         </div>
       </div>
+
+      <!-- Structured (v1) schema fields — populated by renderStructuredFields() -->
+      <div id="structured-fields" hidden></div>
 
       <div class="subtasks-header">
         <h2 class="section-label">Subtasks</h2>
@@ -273,9 +258,11 @@
       <div class="success-icon" aria-hidden="true">✓</div>
       <h2>Tasks created</h2>
       <p id="success-summary"></p>
+      <div id="success-links"></div>
       <div id="success-partial" class="warning"></div>
 
       <div class="actions">
+        <button type="button" class="primary" id="retry-failed" hidden>Retry failed</button>
         <a id="success-project-link" class="primary as-button" target="_blank" rel="noopener" hidden>Open project in Teamwork ↗</a>
         <a id="success-link" class="primary as-button" target="_blank" rel="noopener">Open tasklist in Teamwork ↗</a>
         <button type="button" class="ghost" id="start-over">Build another</button>
