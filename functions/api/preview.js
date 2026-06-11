@@ -74,7 +74,7 @@ PREFIX VOCABULARY (detect and return as the prefixes array — use these exact s
 - "Flat Fee" = covered by a flat-fee SoW or quote
 - "Bank" = drawn from the client's banked hours
 - "?." = genuinely unknown — use this (and add a note in billing.notes) when you can't tell
-A task may carry more than one prefix (common: ["SEO.","C."]). Detect from the input and project context. Do NOT embed the prefix in tasklistName or parentTaskName — it lives in the prefixes field only. Keep those names clean and descriptive (3-8 words, no date unless the work is genuinely month-specific).
+A task may carry more than one prefix (common: ["SEO.","C."]). Detect from the input and project context. Do NOT embed the prefix in tasklistName or parentTaskName — it lives in the prefixes field only. Keep those names clean and descriptive (3-8 words, no date unless the work is genuinely month-specific). Always populate both tasklistName and parentTaskName — they are derivable from the work itself and must never be left empty (this overrides the empty-string rule below, which applies only to genuinely undeterminable fields like dates, owners, or SoW references).
 
 OUTPUT RULES
 - subtasks = the concrete WORK breakdown (imperative actions). acceptance = the DEFINITION OF DONE (observable criteria a reviewer can verify) — these are different; do not duplicate.
@@ -404,7 +404,7 @@ async function structuredDesign(client, body) {
   } catch {
     throw new Error(`model returned non-JSON: ${text.slice(0, 200)}`);
   }
-  if (!parsed?.tasklistName || !parsed?.parentTaskName || !Array.isArray(parsed?.subtasks)) {
+  if (typeof parsed?.tasklistName !== 'string' || typeof parsed?.parentTaskName !== 'string' || !Array.isArray(parsed?.subtasks)) {
     console.error('[structuredDesign] unexpected shape. keys:', Object.keys(parsed ?? {}), 'raw:', text.slice(0, 600));
     throw new Error('model returned an unexpected shape');
   }
@@ -414,7 +414,9 @@ async function structuredDesign(client, body) {
 
   // Normalise: trim names, drop empty subtasks/acceptance rows.
   parsed.tasklistName = parsed.tasklistName.trim();
-  parsed.parentTaskName = parsed.parentTaskName.trim();
+  // A parent task always needs a name; if the model left it blank, fall back to
+  // the (AI-generated) tasklist name rather than publishing an unnamed task.
+  parsed.parentTaskName = parsed.parentTaskName.trim() || parsed.tasklistName;
   parsed.subtasks = parsed.subtasks
     .filter((s) => s?.name?.trim())
     .map((s) => ({ name: s.name.trim(), description: (s.description ?? '').trim() }));
@@ -455,12 +457,14 @@ async function callAnthropic(client, system, userPrompt, schema, { fullDesign = 
 
   // Full-design mode — return the whole object.
   if (fullDesign) {
-    if (!parsed?.tasklistName || !parsed?.parentTaskName || !Array.isArray(parsed?.subtasks)) {
+    if (typeof parsed?.tasklistName !== 'string' || typeof parsed?.parentTaskName !== 'string' || !Array.isArray(parsed?.subtasks)) {
       throw new Error('model returned an unexpected shape');
     }
+    const tasklistName = parsed.tasklistName.trim();
     return {
-      tasklistName: parsed.tasklistName.trim(),
-      parentTaskName: parsed.parentTaskName.trim(),
+      tasklistName,
+      // Fall back to the tasklist name so a parent task is never left unnamed.
+      parentTaskName: parsed.parentTaskName.trim() || tasklistName,
       parentTaskDescription: (parsed.parentTaskDescription ?? '').trim(),
       subtasks: parsed.subtasks
         .filter((s) => s?.name?.trim())
